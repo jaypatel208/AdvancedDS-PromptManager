@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Prompt Manager</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .tag {
+            transition: all 0.2s;
+        }
+
+        .tag:hover {
+            transform: translateY(-2px);
+        }
+
+        .prompt-card {
+            transition: all 0.3s;
+        }
+
+        .prompt-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-indigo-600 text-white shadow-lg">
+        <div class="container mx-auto py-4 px-6">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">AI Prompt Manager</h1>
+                <div>
+                    <a href="/" class="text-white hover:text-indigo-200">Home</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto py-8 px-6">
+        <!-- Search and Add Sections -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Search Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Search Prompts</h2>
+                <form action="/search" method="get" class="mb-4">
+                    <div class="flex gap-2">
+                        <input type="text" name="q" placeholder="Search by text..."
+                            value="{{ search_query if search_query is defined else '' }}"
+                            class="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button type="submit"
+                            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                            Search
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Tag clouds -->
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium mb-2">Tags</h3>
+                    <div class="flex flex-wrap gap-2">
+                        {% if all_tags is defined %}
+                        {% for tag, count in all_tags.items() %}
+                        <a href="/search?tag={{ tag }}"
+                            class="tag bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md text-sm hover:bg-indigo-200 transition">
+                            {{ tag }} ({{ count }})
+                        </a>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Prompt Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Add New Prompt</h2>
+                <form action="/add-prompt" method="post">
+                    <div class="mb-4">
+                        <label for="prompt_text" class="block text-sm font-medium text-gray-700 mb-1">Prompt
+                            Text</label>
+                        <textarea id="prompt_text" name="prompt_text" rows="4" required
+                            class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Enter your AI prompt here..."></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="tags" class="block text-sm font-medium text-gray-700 mb-1">Tags (comma
+                            separated)</label>
+                        <input type="text" id="tags" name="tags"
+                            class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="creative, chatgpt, image-generation" autocomplete="off">
+                        <div id="tag-suggestions" class="bg-white border border-gray-200 rounded-md mt-1 hidden"></div>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">
+                        Save Prompt
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- View Specific Prompt (if viewing one) -->
+        {% if viewing_prompt is defined %}
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-xl font-semibold">Viewing Prompt</h2>
+                <div class="flex gap-2">
+                    <button onclick="usePrompt('{{ viewing_prompt.id }}')"
+                        class="bg-indigo-600 text-white px-3 py-1 rounded-md hover:bg-indigo-700 transition text-sm">
+                        Use Prompt
+                    </button>
+                    <button onclick="deletePrompt('{{ viewing_prompt.id }}')"
+                        class="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition text-sm">
+                        Delete
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-md mb-4">
+                <p class="whitespace-pre-wrap">{{ viewing_prompt.text }}</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                {% for tag in viewing_prompt.tags %}
+                <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md text-sm">{{ tag }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="text-sm text-gray-600">
+                <p>Used {{ viewing_prompt.usage_count }} times</p>
+                <p>Created: {{ viewing_prompt.created_at }}</p>
+                <p>Last used: {{ viewing_prompt.last_accessed }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Search Results (if any) -->
+        {% if search_results is defined and search_results %}
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">
+                Search Results
+                {% if search_query is defined and search_query %}
+                for "{{ search_query }}"
+                {% elif search_tag is defined and search_tag %}
+                for tag "{{ search_tag }}"
+                {% endif %}
+            </h2>
+
+            <div class="grid grid-cols-1 gap-4">
+                {% for prompt in search_results %}
+                <div class="prompt-card border border-gray-200 rounded-lg p-4 hover:border-indigo-300">
+                    <a href="/prompt/{{ prompt.id }}" class="block">
+                        <p class="text-gray-800 mb-2 line-clamp-2">{{ prompt.text }}</p>
+
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            {% for tag in prompt.tags %}
+                            <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-xs">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <p class="text-xs text-gray-500">Used {{ prompt.usage_count }} times</p>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Dashboard Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Most Used Prompts -->
+            {% if most_used is defined and most_used %}
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Most Used Prompts</h2>
+
+                <div class="grid grid-cols-1 gap-4">
+                    {% for prompt in most_used %}
+                    <div class="prompt-card border border-gray-200 rounded-lg p-4 hover:border-indigo-300">
+                        <a href="/prompt/{{ prompt.id }}" class="block">
+                            <p class="text-gray-800 mb-2 line-clamp-2">{{ prompt.text }}</p>
+
+                            <div class="flex flex-wrap gap-1 mb-2">
+                                {% for tag in prompt.tags %}
+                                <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-xs">{{ tag }}</span>
+                                {% endfor %}
+                            </div>
+
+                            <p class="text-xs text-gray-500">Used {{ prompt.count }} times</p>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recently Used Prompts -->
+            {% if recent is defined and recent %}
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Recently Used Prompts</h2>
+
+                <div class="grid grid-cols-1 gap-4">
+                    {% for prompt in recent %}
+                    <div class="prompt-card border border-gray-200 rounded-lg p-4 hover:border-indigo-300">
+                        <a href="/prompt/{{ prompt.id }}" class="block">
+                            <p class="text-gray-800 mb-2 line-clamp-2">{{ prompt.text }}</p>
+
+                            <div class="flex flex-wrap gap-1 mb-2">
+                                {% for tag in prompt.tags %}
+                                <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-xs">{{ tag }}</span>
+                                {% endfor %}
+                            </div>
+
+                            <p class="text-xs text-gray-500">Last used: {{ prompt.last_accessed }}</p>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <script>
+        // Tag autocomplete functionality
+        const tagInput = document.getElementById('tags');
+        const tagSuggestions = document.getElementById('tag-suggestions');
+
+        if (tagInput) {
+            tagInput.addEventListener('input', async () => {
+                const value = tagInput.value;
+                const lastTag = value.split(',').pop().trim();
+
+                if (lastTag.length >= 1) {
+                    try {
+                        const response = await fetch(`/tags/suggest?prefix=${encodeURIComponent(lastTag)}`);
+                        const data = await response.json();
+
+                        if (data.suggestions.length > 0) {
+                            tagSuggestions.innerHTML = '';
+                            data.suggestions.forEach(suggestion => {
+                                const div = document.createElement('div');
+                                div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer';
+                                div.textContent = suggestion;
+                                div.addEventListener('click', () => {
+                                    const tags = tagInput.value.split(',');
+                                    tags.pop();
+                                    tags.push(suggestion);
+                                    tagInput.value = tags.join(', ') + (tags.length > 0 ? ', ' : '');
+                                    tagSuggestions.classList.add('hidden');
+                                    tagInput.focus();
+                                });
+                                tagSuggestions.appendChild(div);
+                            });
+                            tagSuggestions.classList.remove('hidden');
+                        } else {
+                            tagSuggestions.classList.add('hidden');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching tag suggestions:', error);
+                    }
+                } else {
+                    tagSuggestions.classList.add('hidden');
+                }
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (e.target !== tagInput && e.target !== tagSuggestions) {
+                    tagSuggestions.classList.add('hidden');
+                }
+            });
+        }
+
+        // Use prompt functionality
+        async function usePrompt(promptId) {
+            try {
+                const response = await fetch(`/use-prompt/${promptId}`, {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(`Prompt used successfully! Usage count: ${data.usage_count}`);
+                    // Reload page to update counts
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error using prompt:', error);
+                alert('Error using prompt');
+            }
+        }
+
+        // Delete prompt functionality
+        async function deletePrompt(promptId) {
+            if (confirm('Are you sure you want to delete this prompt? This action cannot be undone.')) {
+                try {
+                    const response = await fetch(`/prompt/${promptId}`, {
+                        method: 'DELETE',
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('Prompt deleted successfully!');
+                        // Redirect to home page
+                        window.location.href = '/';
+                    }
+                } catch (error) {
+                    console.error('Error deleting prompt:', error);
+                    alert('Error deleting prompt');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
