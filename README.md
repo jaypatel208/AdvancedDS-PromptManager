@@ -64,7 +64,7 @@ prompt-manager/
 
 1. Clone this repository
    ```
-   git clone https://github.com/yourusername/prompt-manager.git
+   git clone [https://github.com/yourusername/prompt-manager.git](https://github.com/jaypatel208/AdvancedDS-PromptManager)
    cd prompt-manager
    ```
 
